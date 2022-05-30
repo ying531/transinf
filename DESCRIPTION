@@ -1,0 +1,6 @@
+Package: TransInfer
+Type: Package
+Title: A Package for transductive (transfer) inference to other populations
+Version: 0.0.1.0
+Encoding: UTF-8
+RoxygenNote: 7.2.0
