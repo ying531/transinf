@@ -57,6 +57,6 @@ Z = data.frame(X[,1:2])
 new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1)
 data = data.frame(cbind(X,Y))
 lm.mdl = lm(Y~., data = data.frame(X))
-trans.lm(Y~., data, c(1,"X1","X2"), Z, new.Z, alg="grf")
+trans.lm("Y~.", data, c(1,"X1","X2"), Z, new.Z, alg="grf")
 
 }

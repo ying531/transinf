@@ -21,7 +21,7 @@
 #' new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1)
 #' data = data.frame(cbind(X,Y))
 #' lm.mdl = lm(Y~., data = data.frame(X))
-#' trans.lm(Y~., data, c(1,"X1","X2"), Z, new.Z, alg="grf")
+#' trans.lm("Y~.", data, c(1,"X1","X2"), Z, new.Z, alg="grf")
 #' 
 #' @export
 trans.lm <- function(formula, data, param, Z, new.Z, 
@@ -29,7 +29,7 @@ trans.lm <- function(formula, data, param, Z, new.Z,
                      random.seed=NULL,other.params=NULL,folds=NULL){
   n = nrow(data)
   m = nrow(new.Z)
-  
+   
   if (!is.null(random.seed)){
     set.seed(random.seed)
   }
@@ -60,12 +60,12 @@ trans.lm <- function(formula, data, param, Z, new.Z,
     ws = ws[1:n]
   }else{
     ws = weights
-  }
+  } 
   
   ##=====================================##
   ##===== run weighted linear model =====## 
   ##=====================================##
-  
+
   lm.mdl = lm(formula, data, weights=ws)
   
   names = param 
@@ -128,8 +128,10 @@ trans.lm <- function(formula, data, param, Z, new.Z,
     sup.sds[i.par] = sqrt(sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE)^2 + n/m * sd(fit.Zr.new, na.rm=TRUE)^2)
     
     ##===============================================##
-    ##== compute conditional-transductive variance ==##   
-    if (is.null(X) | ncol(X) == ncol(Z)){
+    ##== compute conditional-transductive variance ==##    
+    if (is.null(X)){
+      trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
+    }else if(ncol(X) == ncol(Z)){
       # If X=Z, then directly compute std
       trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
     }else{
@@ -169,11 +171,11 @@ trans.lm <- function(formula, data, param, Z, new.Z,
   trans.ci.lo = trans.coefs - qnorm(0.975) * trans.sds / sqrt(n)
   trans.ci.hi = trans.coefs + qnorm(0.975) * trans.sds / sqrt(n)
   trans.p_vals = 2 * pnorm(abs(trans.coefs) / (trans.sds/sqrt(n)), lower.tail = FALSE) 
-  sup.p_vals = 2 * pnorm(abs(fitted.coef) / (sup.sds/sqrt(n)), lower.tail = FALSE)
+  sup.p_vals = 2 * pnorm(abs(trans.coefs) / (sup.sds/sqrt(n)), lower.tail = FALSE)
   
   # print the results
-  ret_table = cbind(trans.coefs, fitted.coef, trans.sds, trans.p_vals, sup.sds, sup.p_vals)
-  colnames(ret_table) = c("Trans. Estimate", "W. OLS Estimate", 
+  ret_table = cbind(trans.coefs, trans.sds, trans.p_vals, sup.sds, sup.p_vals)
+  colnames(ret_table) = c("Trans. Estimate", #"W. OLS Estimate", 
                           "Trans. Std. Error", "Trans. Pr(>|z|)",
                           "Sup. W. Std. Error", "Sup. W. Pr(>|z|)")
   rownames(ret_table) = names
@@ -217,10 +219,11 @@ trans.lm <- function(formula, data, param, Z, new.Z,
 #' data = data.frame(cbind(X,Y))
 #' Z = data.frame(X[,1:2])
 #' new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1)
-#' trans.glm(Y~., family='binomial', data, c(1,"V1","V2"), Z, new.Z, alg="grf")
+#' trans.glm("Y~.", family='binomial', data, c(1,"V1","V2"), Z, new.Z, alg="grf")
 #' 
 #' @export
-trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg="loess",
+trans.glm <- function(formula,family,data,param,Z,new.Z, 
+                      X=NULL, new.X=NULL,weights=NULL,alg="loess",
                      random.seed=NULL,other.params=NULL,folds=NULL){
   n = nrow(data)
   m = nrow(new.Z)
@@ -323,7 +326,9 @@ trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg=
     
     ##===============================================##
     ##== compute conditional-transductive variance ==##   
-    if (is.null(X) | ncol(X) == ncol(Z)){
+    if (is.null(X)){
+      trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
+    }else if(ncol(X) == ncol(Z)){
       # If X=Z, then directly compute std
       trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
     }else{
@@ -362,11 +367,12 @@ trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg=
   trans.ci.lo = trans.coefs - qnorm(0.975) * trans.sds / sqrt(n)
   trans.ci.hi = trans.coefs + qnorm(0.975) * trans.sds / sqrt(n)
   trans.p_vals = 2 * pnorm(abs(trans.coefs) / (trans.sds/sqrt(n)), lower.tail = FALSE) 
-  sup.p_vals = 2 * pnorm(abs(fitted.coef) / (sup.sds/sqrt(n)), lower.tail = FALSE)
+  sup.p_vals = 2 * pnorm(abs(trans.coef) / (sup.sds/sqrt(n)), lower.tail = FALSE)
   
   # print the results
-  ret_table = cbind(trans.coefs, fitted.coef, trans.sds, trans.p_vals, sup.sds, sup.p_vals)
-  colnames(ret_table) = c("Trans. Estimate", "W. OLS Estimate", 
+  ret_table = cbind(trans.coefs, #fitted.coef, 
+                    trans.sds, trans.p_vals, sup.sds, sup.p_vals)
+  colnames(ret_table) = c("Trans. Estimate", #"W. OLS Estimate", 
                           "Trans. Std. Error", "Trans. Pr(>|z|)",
                           "Sup. W. Std. Error", "Sup. W. Pr(>|z|)")
   rownames(ret_table) = names

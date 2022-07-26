@@ -11,6 +11,8 @@ trans.glm(
   param,
   Z,
   new.Z,
+  X = NULL,
+  new.X = NULL,
   weights = NULL,
   alg = "loess",
   random.seed = NULL,
@@ -31,6 +33,10 @@ trans.glm(
 
 \item{new.Z}{New data for the covariate shift attributes}
 
+\item{X}{The dataframe for conditioning attributes; provide only when it differs from Z; need to be a subset of Z}
+
+\item{new.X}{New data for the conditioning attributes; provide only when it differs from new.Z; need to be a subset of new.Z}
+
 \item{weights}{Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package}
 
 \item{alg}{Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include `loess` and `grf`}
@@ -40,10 +46,6 @@ trans.glm(
 \item{other.params}{Optional, other parameters for the regression algorithm; can include span and degree for loess}
 
 \item{folds}{Optional, a list of two folds of indices for sample splitting; can be useful to control sample splitting}
-
-\item{X}{The dataframe for conditioning attributes; provide only when it differs from Z; need to be a subset of Z}
-
-\item{new.X}{New data for the conditioning attributes; provide only when it differs from new.Z; need to be a subset of new.Z}
 }
 \value{
 Estimate for new conditional parameter, Estimate in default weighted OLS, standard errors and p-values for transductive inference, conditional confidence intervals for the new conditional parameter, standard errors and p-values for weighted OLS
@@ -58,6 +60,6 @@ Y = rbinom(n, 1, exp(logit.x)/(1+exp(logit.x)))
 data = data.frame(cbind(X,Y))
 Z = data.frame(X[,1:2])
 new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1)
-trans.glm(Y~., family='binomial', data, c(1,"V1","V2"), Z, new.Z, alg="grf")
+trans.glm("Y~.", family='binomial', data, c(1,"V1","V2"), Z, new.Z, alg="grf")
 
 }
