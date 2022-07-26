@@ -12,7 +12,7 @@ trans.lm(
   new.Z,
   X = NULL,
   new.X = NULL,
-  weights = NULL,
+  wts = NULL,
   alg = "loess",
   random.seed = NULL,
   other.params = NULL,
@@ -34,7 +34,7 @@ trans.lm(
 
 \item{new.X}{New data for the conditioning attributes; need to be a subset of new.Z; if not given, we use new.Z}
 
-\item{weights}{Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package}
+\item{wts}{Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package}
 
 \item{alg}{Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include `loess` and `grf`}
 

@@ -8,7 +8,7 @@
 #' @param new.Z New data for the covariate shift attributes 
 #' @param X The dataframe for conditioning attributes; need to be a subset of Z; if not given, we use Z
 #' @param new.X New data for the conditioning attributes; need to be a subset of new.Z; if not given, we use new.Z
-#' @param weights Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package
+#' @param wts Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package
 #' @param alg Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include `loess` and `grf`
 #' @param random.seed Optional, random seed for sample splitting
 #' @param other.params Optional, other parameters for the regression algorithm; can include span and degree for loess
@@ -25,7 +25,7 @@
 #' 
 #' @export
 trans.lm <- function(formula, data, param, Z, new.Z, 
-                     X=NULL, new.X=NULL, weights=NULL, alg="loess",
+                     X=NULL, new.X=NULL, wts=NULL, alg="loess",
                      random.seed=NULL,other.params=NULL,folds=NULL){
   n = nrow(data)
   m = nrow(new.Z)
@@ -45,9 +45,8 @@ trans.lm <- function(formula, data, param, Z, new.Z,
   ##=======================================##
   ##=== fit the weights if not provided ===## 
   ##=======================================## 
-  if (is.null(weights)){
-    ws = rep(0, m+n)
-    
+  ws = rep(0, m+n)
+  if (is.null(wts)){ 
     df.Z = data.frame(rbind(as.matrix(Z), as.matrix(new.Z)))
     label.Z = c(rep(0, nrow(Z)), rep(1, nrow(new.Z)))
     # cross fitting 
@@ -59,14 +58,14 @@ trans.lm <- function(formula, data, param, Z, new.Z,
     ws[fold2] = rf.pred.2 * n / ((1-rf.pred.2) * m)
     ws = ws[1:n]
   }else{
-    ws = weights
+    ws = wts
   } 
   
   ##=====================================##
   ##===== run weighted linear model =====## 
   ##=====================================##
-
-  lm.mdl = lm(formula, data, weights=ws)
+  print(ws)
+  lm.mdl = lm.internal(formula=formula, data=data, weights=ws)
   
   names = param 
   for (i.par in 1:length(param)){
@@ -264,7 +263,7 @@ trans.glm <- function(formula,family,data,param,Z,new.Z,
   ##========= run weighted GLM =========## 
   ##====================================##
   
-  glm.mdl = glm(formula, family = family, data, weights=ws)
+  glm.mdl = glm.internal(formula, family = family, data, weights=ws)
   
   names = param 
   for (i.par in 1:length(param)){
@@ -391,3 +390,17 @@ trans.glm <- function(formula,family,data,param,Z,new.Z,
   
 }
 
+# for preparation, not exported
+lm.internal <- function(formula, data, weights)
+{
+  envir <- list2env(list(weights=weights), parent=environment(formula))
+  environment(formula) <- envir
+  lm(formula, data=data, weights=weights)
+}
+
+glm.internal <- function(formula, data, family, weights)
+{
+  envir <- list2env(list(weights=weights), parent=environment(formula))
+  environment(formula) <- envir
+  glm(formula, data=data, family=family, weights=weights)
+}
