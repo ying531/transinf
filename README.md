@@ -16,7 +16,7 @@ In our simulation setting, there is an unknown covariate shift on all the regres
 
 
 
-All the codes are in `example.R`, where `gen.data()` generates synthetic datasets, `weight.simu.oracle(seed)` runs weighted OLS with true weights, `weight.simu.fitted(seed)` runs weighted OLS with fitted weights, `weight.simu(seed)` runs our procedure. To run all the experiments below, simply load the file `example.R`. 
+All the codes are in `example.R`, where `gen.data()` generates synthetic datasets, `weight.simu.oracle(seed)` runs weighted OLS with true weights, `weight.simu.fitted(seed)` runs weighted OLS with fitted weights, `weight.simu(seed)` runs our procedure (an equivalent implementation as the package). To run all the experiments below, simply load the file `example.R`. 
 
 
 
@@ -37,10 +37,43 @@ In practice the weights are typically unknown. The common way is to run weighted
 > res.fitted = sapply(1:1000, weight.simu.fitted)
 > mean( (1.0930 >= (res.fitted[1,] -  res.fitted[2,]*qnorm(0.975))) *
 +         (1.0930 <= (res.fitted[1,] +  res.fitted[2,]*qnorm(0.975))) )
+[1] 0.870
+```
 
+There is severe undercover. This is because the weights often cannot be estimated accurately, incurring a bias which is much larger than the asymptotic variance. 
+
+
+
+Our method builds confidence intervals around an estimator with a correction term. This allows us to conduct root-n inference when the weights are estimated at a lower rate. The weights are still estimated with `regression_forest` from the `grf` package. 
+
+```R
+> res.trans = sapply(1:1000, weight.simu.trans)
+> mean( (1.0930 >= (res.trans[1,] -  res.trans[2,]*qnorm(0.975))) *
++         (1.0930 <= (res.trans[1,] +  res.trans[2,]*qnorm(0.975))) )
+[1] 0.946
+```
+
+We indeed obtain valid coverage with moderate sample sizes. Indeed, our confidence intervals are even shorter than the previous two methods (without correction). We note that this is not a general rule: our confidence intervals might be longer if the size of the new datset, `m`, is smaller.
+
+```R
+mean.len.orc = mean(res.orc[2,])
+mean.len.fitted = mean(res.fitted[2,])
+mean.len.trans = mean(res.trans[2,])
+
+c(mean.len.orc, mean.len.fitted, mean.len.trans)
+
+[1] 0.04468186 0.04383533 0.04223867
 ```
 
 
+
+Furthermore, if you would like to infer parameters about a finite population with observed covariates, turning to conditional parameter allows for shorter confidence intervals and conditional validity. 
+
+```R
+cat(mean(res.trans[3,]))
+
+[1] 0.03998838
+```
 
 
 

@@ -63,8 +63,7 @@ trans.lm <- function(formula, data, param, Z, new.Z,
   
   ##=====================================##
   ##===== run weighted linear model =====## 
-  ##=====================================##
-  print(ws)
+  ##=====================================## 
   lm.mdl = lm.internal(formula=formula, data=data, weights=ws)
   
   names = param 
