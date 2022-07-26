@@ -2,7 +2,7 @@
 % Please edit documentation in R/trans.R
 \name{trans.glm}
 \alias{trans.glm}
-\title{Transductive inference for linear model}
+\title{Transductive inference for generalized linear model}
 \usage{
 trans.glm(
   formula,
@@ -27,9 +27,9 @@ trans.glm(
 
 \item{param}{The coefficients to conduct transductive inference, can be a mixture of string names and integer indices}
 
-\item{Z}{The dataframe of the conditioning set}
+\item{Z}{The dataframe for covariate shift attributes}
 
-\item{new.Z}{New data for the conditioning variables}
+\item{new.Z}{New data for the covariate shift attributes}
 
 \item{weights}{Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package}
 
@@ -40,6 +40,10 @@ trans.glm(
 \item{other.params}{Optional, other parameters for the regression algorithm; can include span and degree for loess}
 
 \item{folds}{Optional, a list of two folds of indices for sample splitting; can be useful to control sample splitting}
+
+\item{X}{The dataframe for conditioning attributes; provide only when it differs from Z; need to be a subset of Z}
+
+\item{new.X}{New data for the conditioning attributes; provide only when it differs from new.Z; need to be a subset of new.Z}
 }
 \value{
 Estimate for new conditional parameter, Estimate in default weighted OLS, standard errors and p-values for transductive inference, conditional confidence intervals for the new conditional parameter, standard errors and p-values for weighted OLS

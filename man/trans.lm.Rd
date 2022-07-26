@@ -10,6 +10,8 @@ trans.lm(
   param,
   Z,
   new.Z,
+  X = NULL,
+  new.X = NULL,
   weights = NULL,
   alg = "loess",
   random.seed = NULL,
@@ -24,9 +26,13 @@ trans.lm(
 
 \item{param}{The coefficients to conduct transductive inference, can be a mixture of string names and integer indices}
 
-\item{Z}{The dataframe of the conditioning set}
+\item{Z}{The dataframe for covariate shift attributes}
 
-\item{new.Z}{New data for the conditioning variables}
+\item{new.Z}{New data for the covariate shift attributes}
+
+\item{X}{The dataframe for conditioning attributes; need to be a subset of Z; if not given, we use Z}
+
+\item{new.X}{New data for the conditioning attributes; need to be a subset of new.Z; if not given, we use new.Z}
 
 \item{weights}{Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package}
 

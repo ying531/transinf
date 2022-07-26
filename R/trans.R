@@ -4,8 +4,10 @@
 #' @param formula The formula for lm() regression
 #' @param data The dataframe for lm() regression 
 #' @param param The coefficients to conduct transductive inference, can be a mixture of string names and integer indices
-#' @param Z The dataframe of the conditioning set 
-#' @param new.Z New data for the conditioning variables
+#' @param Z The dataframe for covariate shift attributes 
+#' @param new.Z New data for the covariate shift attributes 
+#' @param X The dataframe for conditioning attributes; need to be a subset of Z; if not given, we use Z
+#' @param new.X New data for the conditioning attributes; need to be a subset of new.Z; if not given, we use new.Z
 #' @param weights Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package
 #' @param alg Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include `loess` and `grf`
 #' @param random.seed Optional, random seed for sample splitting
@@ -22,7 +24,8 @@
 #' trans.lm(Y~., data, c(1,"X1","X2"), Z, new.Z, alg="grf")
 #' 
 #' @export
-trans.lm <- function(formula, data, param, Z, new.Z, weights=NULL, alg="loess",
+trans.lm <- function(formula, data, param, Z, new.Z, 
+                     X=NULL, new.X=NULL, weights=NULL, alg="loess",
                      random.seed=NULL,other.params=NULL,folds=NULL){
   n = nrow(data)
   m = nrow(new.Z)
@@ -39,7 +42,9 @@ trans.lm <- function(formula, data, param, Z, new.Z, weights=NULL, alg="loess",
   } 
   fold2 = setdiff(1:(n+m), fold1) 
   
-  # fit the weights if they are not fed in
+  ##=======================================##
+  ##=== fit the weights if not provided ===## 
+  ##=======================================## 
   if (is.null(weights)){
     ws = rep(0, m+n)
     
@@ -57,9 +62,9 @@ trans.lm <- function(formula, data, param, Z, new.Z, weights=NULL, alg="loess",
     ws = weights
   }
   
-  #######
-  # run weighted linear model  
-  #######
+  ##=====================================##
+  ##===== run weighted linear model =====## 
+  ##=====================================##
   
   lm.mdl = lm(formula, data, weights=ws)
   
@@ -76,14 +81,17 @@ trans.lm <- function(formula, data, param, Z, new.Z, weights=NULL, alg="loess",
   # obtain estimate for psi(D_i)
   uw.infl.vals = diag(as.vector(1/ws)) %*% infl.vals  
   
+  ##======================================##
+  ##======= transductive inference =======## 
+  ##======================================##
+  
   trans.coefs = rep(0, length(param))
   trans.sds = rep(0, length(param))
   sup.sds = rep(0, length(param))
   
   for (i.par in 1:length(param)){ 
-    #######
-    # conditional mean regression
-    #######
+    ##=======================================##
+    ##===== conditional mean regression =====## 
     fit.Zr = rep(0, n)
     fit.Zr.new = rep(0, m)
     # LOESS regression
@@ -98,22 +106,63 @@ trans.lm <- function(formula, data, param, Z, new.Z, weights=NULL, alg="loess",
       fit.Zr[fold1[fold1<=n]] = predict(Zr.1, data.frame(Z[fold1[fold1<=n],]))
       fit.Zr[fold2[fold2<=n]] = predict(Zr.2, data.frame(Z[fold2[fold2<=n],]))
       fit.Zr.new = (predict(Zr.1, data.frame(new.Z)) + predict(Zr.2, data.frame(new.Z)))/2
-    }
-    
+    } 
     # random forest regression
     if (alg == 'grf'){
       # cross-fit nonparametric regression models
-      Zr.1 = regression_forest(data.frame(Z[fold2[fold2<=n],]), uw.infl.vals[fold2[fold2<=n],i.par], num.threads=1)
-      Zr.2 = regression_forest(data.frame(Z[fold1[fold1<=n],]), uw.infl.vals[fold1[fold1<=n],i.par], num.threads=1)
+      Zr.1 = regression_forest(data.frame(Z[fold2[fold2<=n],]), 
+                               uw.infl.vals[fold2[fold2<=n],i.par], num.threads=1)
+      Zr.2 = regression_forest(data.frame(Z[fold1[fold1<=n],]), 
+                               uw.infl.vals[fold1[fold1<=n],i.par], num.threads=1)
       fit.Zr[fold1[fold1<=n]] = predict(Zr.1, data.frame(Z[fold1[fold1<=n],]))$predictions
       fit.Zr[fold2[fold2<=n]] = predict(Zr.2, data.frame(Z[fold2[fold2<=n],]))$predictions
       fit.Zr.new = (predict(Zr.1, data.frame(new.Z))$predictions + predict(Zr.2, data.frame(new.Z))$predictions)/2
     }
     
+    ##======================================##
+    ##=== compute transductive estimator ===##  
     trans.coefs[i.par] = fitted.coef[i.par] - mean(ws * fit.Zr, na.rm=TRUE) + mean(fit.Zr.new, na.rm=TRUE)
     
-    sup.sds[i.par] = sd(infl.vals[,i.par], na.rm=TRUE)
-    trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
+    ##=======================================##
+    ##== compute super-population variance ==##   
+    sup.sds[i.par] = sqrt(sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE)^2 + n/m * sd(fit.Zr.new, na.rm=TRUE)^2)
+    
+    ##===============================================##
+    ##== compute conditional-transductive variance ==##   
+    if (is.null(X) | ncol(X) == ncol(Z)){
+      # If X=Z, then directly compute std
+      trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
+    }else{
+      # cross-fit E[phi(D)|Z] on X in the new population
+      fit.Xr = rep(0, m)
+      # LOESS regression
+      if (alg == 'loess'){
+        loess.span = ifelse(is.null(other.params$span), 0.75, other.params$span)
+        loess.deg = ifelse(is.null(other.params$degree), 2, other.params$degree) 
+        # cross-fit nonparametric regression models
+        Xr.1 = loess(fit.Zr.new[fold2[fold2>n]]~., data=data.frame(X.new[fold2[fold2>n],]),
+                     span=loess.span, degree=loess.deg) 
+        Xr.2 = loess(fit.Zr.new[fold1[fold1>n]]~., data=data.frame(X.new[fold1[fold1>n],]),
+                     span=loess.span, degree=loess.deg) 
+        fit.Xr[fold1[fold1>n]] = predict(Xr.1, data.frame(X.new[fold1[fold1>n],]))
+        fit.Xr[fold2[fold2>n]] = predict(Xr.2, data.frame(X.new[fold2[fold2>n],])) 
+      } 
+      # random forest regression
+      if (alg == 'grf'){
+        # cross-fit nonparametric regression models
+        Zr.1 = regression_forest(data.frame(X.new[fold2[fold2>n],]), 
+                                 fit.Zr.new[fold2[fold2>n]], num.threads=1)
+        Zr.2 = regression_forest(data=data.frame(X.new[fold1[fold1>n],]), 
+                                 fit.Zr.new[fold1[fold1>n]], num.threads=1)
+        fit.Xr[fold1[fold1>n]] = predict(Zr.1, data.frame(X.new[fold1[fold1>n],]))$predictions
+        fit.Xr[fold2[fold2>n]] = predict(Zr.2, data.frame(X.new[fold2[fold2>n],]))$predictions 
+      }
+      # compute the variance
+      trans.sds[i.par] = sqrt(min(sd(ws*uw.infl.vals[,i.par], na.rm=TRUE)^2, 
+                             mean(ws^2*(uw.infl.vals[,i.par] - fit.Zr)^2, na.rm=TRUE)) + 
+        n/m * mean((fit.Zr.new - fit.Xr)^2, na.rm=TRUE))
+    }
+    
     
   }
   
@@ -144,15 +193,17 @@ trans.lm <- function(formula, data, param, Z, new.Z, weights=NULL, alg="loess",
 }
 
 
-#' Transductive inference for linear model 
+#' Transductive inference for generalized linear model 
 #' 
 #' Implement the transductive inference procedure for (weighted) generalized linear regression, wrapping around glm() function 
 #' @param formula The formula for glm() regression
 #' @param family The family parameter for glm() regression
 #' @param data The dataframe for glm() regression 
 #' @param param The coefficients to conduct transductive inference, can be a mixture of string names and integer indices
-#' @param Z The dataframe of the conditioning set 
-#' @param new.Z New data for the conditioning variables
+#' @param Z The dataframe for covariate shift attributes 
+#' @param new.Z New data for the covariate shift attributes 
+#' @param X The dataframe for conditioning attributes; provide only when it differs from Z; need to be a subset of Z 
+#' @param new.X New data for the conditioning attributes; provide only when it differs from new.Z; need to be a subset of new.Z 
 #' @param weights Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package
 #' @param alg Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include `loess` and `grf`
 #' @param random.seed Optional, random seed for sample splitting
@@ -186,7 +237,9 @@ trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg=
   } 
   fold2 = setdiff(1:(n+m), fold1) 
   
-  # fit the weights if they are not fed in
+  ##=======================================##
+  ##=== fit the weights if not provided ===## 
+  ##=======================================## 
   if (is.null(weights)){
     ws = rep(0, m+n)
     
@@ -204,9 +257,9 @@ trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg=
     ws = weights
   }
   
-  #######
-  # run weighted linear model  
-  #######
+  ##====================================##
+  ##========= run weighted GLM =========## 
+  ##====================================##
   
   glm.mdl = glm(formula, family = family, data, weights=ws)
   
@@ -223,14 +276,17 @@ trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg=
   # obtain estimate for psi(D_i)
   uw.infl.vals = diag(as.vector(1/ws)) %*% infl.vals  
   
+  ##======================================##
+  ##======= transductive inference =======## 
+  ##======================================##
+  
   trans.coefs = rep(0, length(param))
   trans.sds = rep(0, length(param))
   sup.sds = rep(0, length(param))
   
   for (i.par in 1:length(param)){ 
-    #######
-    # conditional mean regression
-    #######
+    ##=======================================##
+    ##===== conditional mean regression =====## 
     fit.Zr = rep(0, n)
     fit.Zr.new = rep(0, m)
     # LOESS regression
@@ -257,10 +313,49 @@ trans.glm <- function(formula, family, data, param, Z, new.Z, weights=NULL, alg=
       fit.Zr.new = (predict(Zr.1, data.frame(new.Z))$predictions + predict(Zr.2, data.frame(new.Z))$predictions)/2
     }
     
+    ##======================================##
+    ##=== compute transductive estimator ===##  
     trans.coefs[i.par] = fitted.coef[i.par] - mean(ws * fit.Zr, na.rm=TRUE) + mean(fit.Zr.new, na.rm=TRUE)
     
-    sup.sds[i.par] = sd(infl.vals[,i.par], na.rm=TRUE)
-    trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
+    ##=======================================##
+    ##== compute super-population variance ==##   
+    sup.sds[i.par] = sqrt(sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE)^2 + n/m * sd(fit.Zr.new, na.rm=TRUE)^2)
+    
+    ##===============================================##
+    ##== compute conditional-transductive variance ==##   
+    if (is.null(X) | ncol(X) == ncol(Z)){
+      # If X=Z, then directly compute std
+      trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
+    }else{
+      # cross-fit E[phi(D)|Z] on X in the new population
+      fit.Xr = rep(0, m)
+      # LOESS regression
+      if (alg == 'loess'){
+        loess.span = ifelse(is.null(other.params$span), 0.75, other.params$span)
+        loess.deg = ifelse(is.null(other.params$degree), 2, other.params$degree) 
+        # cross-fit nonparametric regression models
+        Xr.1 = loess(fit.Zr.new[fold2[fold2>n]]~., data=data.frame(X.new[fold2[fold2>n],]),
+                     span=loess.span, degree=loess.deg) 
+        Xr.2 = loess(fit.Zr.new[fold1[fold1>n]]~., data=data.frame(X.new[fold1[fold1>n],]),
+                     span=loess.span, degree=loess.deg) 
+        fit.Xr[fold1[fold1>n]] = predict(Xr.1, data.frame(X.new[fold1[fold1>n],]))
+        fit.Xr[fold2[fold2>n]] = predict(Xr.2, data.frame(X.new[fold2[fold2>n],])) 
+      } 
+      # random forest regression
+      if (alg == 'grf'){
+        # cross-fit nonparametric regression models
+        Zr.1 = regression_forest(data.frame(X.new[fold2[fold2>n],]), 
+                                 fit.Zr.new[fold2[fold2>n]], num.threads=1)
+        Zr.2 = regression_forest(data=data.frame(X.new[fold1[fold1>n],]), 
+                                 fit.Zr.new[fold1[fold1>n]], num.threads=1)
+        fit.Xr[fold1[fold1>n]] = predict(Zr.1, data.frame(X.new[fold1[fold1>n],]))$predictions
+        fit.Xr[fold2[fold2>n]] = predict(Zr.2, data.frame(X.new[fold2[fold2>n],]))$predictions 
+      }
+      # compute the variance
+      trans.sds[i.par] = sqrt(min(sd(ws*uw.infl.vals[,i.par], na.rm=TRUE)^2, 
+                                  mean(ws^2*(uw.infl.vals[,i.par] - fit.Zr)^2, na.rm=TRUE)) + 
+                                n/m * mean((fit.Zr.new - fit.Xr)^2, na.rm=TRUE))
+    }
     
   }
   
