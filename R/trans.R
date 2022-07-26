@@ -367,7 +367,7 @@ trans.glm <- function(formula,family,data,param,Z,new.Z,
   trans.ci.lo = trans.coefs - qnorm(0.975) * trans.sds / sqrt(n)
   trans.ci.hi = trans.coefs + qnorm(0.975) * trans.sds / sqrt(n)
   trans.p_vals = 2 * pnorm(abs(trans.coefs) / (trans.sds/sqrt(n)), lower.tail = FALSE) 
-  sup.p_vals = 2 * pnorm(abs(trans.coef) / (sup.sds/sqrt(n)), lower.tail = FALSE)
+  sup.p_vals = 2 * pnorm(abs(trans.coefs) / (sup.sds/sqrt(n)), lower.tail = FALSE)
   
   # print the results
   ret_table = cbind(trans.coefs, #fitted.coef, 
