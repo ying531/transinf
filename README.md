@@ -147,7 +147,7 @@ If `weights` is not given, or you would like to use `alg = 'grf'` as the regress
 
 ## Examples
 
-### Transductive inference for linear models
+#### Transductive inference for linear models
 
 The following example works out transductive inference of linear regression coefficients (setting `param=1` selects the intercept) for a well-specified linear model. We use `grf` to fit the conditional mean functions of the influence function.  By default, the covariate shifts hold for the attributes in Z (containing 'X1' and 'x2'), and we conduct Z-conditional inference. 
 
