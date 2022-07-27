@@ -8,7 +8,7 @@ R package that implements conditional transductive inference for lm and glm mode
 
 ## Basic usage
 
-Suppose one would like to transfer the linear model Y~X to a new population, and there is a covariate shift on attributes Z, a subset of the original covariates. Let `Z.new` store the new attributes, `data` be the original dataset containing Y and X (names for the attributes in Z should be consistent in `Z.new` and `data`). Then simply run the original linear model with `lm()`. The `transfer` function in our package takes the `lm()` object as input and transfer it to the new population. 
+Suppose one would like to transfer the linear model Y~X to a new population, and there is a covariate shift on attributes Z, a subset of the original covariates. Let `Z.new` store the new attributes, `data` be the original dataset containing Y and X (*names for the attributes in Z should be consistent in `Z.new` and `data`*). Then simply run the original linear model with `lm()`. The `transfer` function in our package takes the `lm()` object as input and transfer it to the new population. 
 
 ```R
 lm.mdl = lm(Y~., data = data) 
@@ -115,7 +115,7 @@ transfer(
 )
 ```
 
-This function takes a fitted `lm()` or `glm()` object as input, and transfers it to a new population.  
+This function takes a fitted `lm()` or `glm()` object as input, and transfers it to a new population.  You also need to specify `df.new`, the covariate shift attributes in the new population. **Please make sure the column names are consistent across the data used in lm() or glm() and in `df.new`**.
 
 | `object`       | The formula for lm() regression                              |
 | -------------- | ------------------------------------------------------------ |
@@ -237,3 +237,4 @@ X3        3.150276          7.151847    4.202572e-44        7.202032  1.627970e-
 X2        2.021570          7.933163    7.737493e-16        7.981118  1.148373e-15
 
 ```
+
