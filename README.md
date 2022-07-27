@@ -22,9 +22,9 @@ glm.mdl = lm(Y~., family = 'binomial', data = data)
 tglm.mdl = transfer(glm.mdl, df.new = Z.new)
 ```
 
-For details on the statistical inference procedure and theory, see [our paper](https://arxiv.org/abs/2104.04565). For details on the usage, see the Documentation part below. 
+For details on the statistical inference procedure and theory, see [our paper](https://arxiv.org/abs/2104.04565). For details on the usage, see the Documentation and Examples parts below. 
 
-## Why using our method
+## Why our method
 
 We illustrate the necessity of using our method when there is a covariate shift and covariates from the target distribution are observed. Before talking about conditional inference, we look at the conventional setting where the target is a super-population parameter. We will use the example of ordinary least squares (OLS) under covariate shifts. 
 
@@ -99,8 +99,6 @@ cat(mean(res.trans[3,]))
 
 ## Documentation
 
-##### Usage
-
 
 ```
 transfer( 
@@ -144,6 +142,7 @@ If `weights` is not given, or you would like to use `alg = 'grf'` as the regress
 | `sup.std.err` | Standard errors for super-population inference using our method |
 | `sup.pval`    | P-values for super-population parameter (testing for whether the new super-population parameter is zero) using our method, built around `trans.coef`) |
 | `summary`    | Summary table of the model fitting results; the printed result for `verbose=TRUE` |
+
 
 
 ## Examples
