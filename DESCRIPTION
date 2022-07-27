@@ -1,4 +1,4 @@
-Package: TransInfer
+Package: transinf
 Type: Package
 Title: A Package for transductive (transfer) inference to other populations
 Version: 0.0.1.0

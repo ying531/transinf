@@ -30,7 +30,7 @@ weight.simu.oracle <- function(seed){
   colnames(dtrain)[11] = "Y" 
   weighted.orc = lm(Y~., data = dtrain, weights = data$wx.org)
   w.orc.influence = influence(weighted.orc)$coefficients[,2]
-  return(c( weighted.orc$coefficients[2], sqrt(n)*sd(w.orc.influence)))
+  return(c( weighted.orc$coefficients[2], sqrt(nrow(data$X.org))*sd(w.orc.influence)))
 } 
 
 weight.simu.fitted <- function(seed){
@@ -38,62 +38,29 @@ weight.simu.fitted <- function(seed){
   data = gen.data() 
   dtrain = data.frame(cbind(data$X.org, data$Y.org)) 
   colnames(dtrain)[11] = "Y" 
-  # fit the covariate shift 
-  hat.ex.org = predict(regression_forest(data.frame(rbind(X.org, X.new)), c(rep(0,n), rep(1,m))), X.org)$predictions
-  hat.wx.org = hat.ex.org * n / (m * (1-hat.ex.org))
-  # plug in and weighted OLS
-  weighted.lm = lm(Y~., data = dtrain, weights = hat.wx.org)
-  w.influence = influence(weighted.lm)$coefficients[,2:3] 
-  return(c( weighted.lm$coefficients[2], sqrt(n)*sd(w.influence)))
+  n = nrow(data$X.org)
+  m = nrow(data$X.new)
+  # fit the covariate shift and plug into weighted OLS
+  hat.ex.org = predict(regression_forest(data.frame(rbind(data$X.org, data$X.new)), 
+                                         c(rep(0,n), rep(1,m))), data$X.org)$predictions
+  hat.wx.org = hat.ex.org * n / (m * (1-hat.ex.org)) 
+  weighted.lm = lm(Y~., data = dtrain, weights = hat.wx.org) 
+  return(c( weighted.lm$coefficients[2], sqrt(n)*sd(influence(weighted.lm)$coefficients[,2:3] )))
 }
  
 
-weight.simu <- function(seed){
+weight.simu.trans <- function(seed){
   set.seed(seed)
   data = gen.data()  
+  dtrain = data.frame(cbind(data$X.org, data$Y.org)) 
+  colnames(dtrain)[11] = "Y" 
+  X.new = data.frame(data$X.new)
+  lm.mdl = lm(Y~., data = dtrain)
+  tlm.mdl = transfer(lm.mdl, df.new=X.new, alg='grf', verbose=FALSE)
   
-  n = 1000
-  m = 1000
-  # our weighted procedure with correction 
-  fold1 = sample(1:(n+m), floor((n+m)/2))  
-  fold2 = setdiff(1:(n+m), fold1) 
-  # cross-fitting the weights
-  ws = rep(0, m+n) 
-  df.Z = data.frame(rbind(data$X.org, data$X.new))
-  label.Z = c(rep(0,n),rep(1,m)) 
-  Z.rf.1 = regression_forest(df.Z[fold2,], label.Z[fold2])
-  rf.pred.1 = predict(Z.rf.1, newdata = df.Z[fold1,])$predictions
-  Z.rf.2 = regression_forest(df.Z[fold1,], label.Z[fold1])
-  rf.pred.2 = predict(Z.rf.2, newdata = df.Z[fold2,])$predictions
-  ws[fold1] = rf.pred.1 * n / ((1-rf.pred.1) * m)
-  ws[fold2] = rf.pred.2 * n / ((1-rf.pred.2) * m)
-  ws = ws[1:n]
-  # fit weighted lm 
-  lm.mdl = lm(Y~., data=dtrain, weights=ws)
-  fitted.coef = coef(lm.mdl)[2]
-  # infl.vals computes w_i * psi(D_i)
-  infl.vals = n * influence(lm.mdl)$coefficients[,2] 
-  # obtain estimate for psi(D_i)
-  uw.infl.vals = infl.vals / ws   
-  
-  # conditional mean regression with grf
-  fit.Zr = rep(0, n)
-  fit.Zr.new = rep(0, m)  
-  Zr.1 = regression_forest(data.frame(data$X.org[fold2[fold2<=n],]), uw.infl.vals[fold2[fold2<=n]], num.threads=1)
-  Zr.2 = regression_forest(data.frame(data$X.org[fold1[fold1<=n],]), uw.infl.vals[fold1[fold1<=n]], num.threads=1)
-  fit.Zr[fold1[fold1<=n]] = predict(Zr.1, data.frame(data$X.org[fold1[fold1<=n],]))$predictions
-  fit.Zr[fold2[fold2<=n]] = predict(Zr.2, data.frame(data$X.org[fold2[fold2<=n],]))$predictions
-  fit.Zr.new = (predict(Zr.1, data.frame(data$X.new))$predictions + predict(Zr.2, data.frame(data$X.new))$predictions)/2
-  
-  trans.coef = fitted.coef - mean(ws * fit.Zr, na.rm=TRUE) + mean(fit.Zr.new, na.rm=TRUE)
-  
-  trans.sd = sqrt(  sd(ws * (uw.infl.vals - fit.Zr), na.rm=TRUE)^2/n + 1/m * sd(fit.Zr.new, na.rm=TRUE)^2 )
-  trans.cond.sd = sd(ws * (uw.infl.vals - fit.Zr), na.rm=TRUE)  
-  
-  return(c(trans.coef, trans.sd, trans.cond.sd))
+  return(c(tlm.mdl$trans.coef[2], tlm.mdl$sup.w.std.err[2]/sqrt(nrow(data$X.org)), 
+           tlm.mdl$trans.std.err[2]/sqrt(nrow(data$X.org))))
 }
-
-
 
 
 ### the illustrating example 
