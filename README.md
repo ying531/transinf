@@ -117,9 +117,9 @@ transfer(
 
 This function takes a fitted `lm()` or `glm()` object as input, and transfers it to a new population.  You also need to specify `df.new`, the covariate shift attributes in the new population. **Please make sure the column names are consistent across the data used in lm() or glm() and in `df.new`**.
 
-| `object`       | The formula for lm() regression                              |
-| -------------- | ------------------------------------------------------------ |
-| `data`         | An lm() or glm() object that fits the original regression    |
+| Arguments      | Description                                                  |
+| -------------- | ------------------------------------------------------------ | 
+| `object`    | An lm() or glm() object that fits the original regression    |
 | `df.new`       | Dataframe for covariate shift attributes for the new population |
 | `df.cond.new`  | Dataframe for the new conditioning set; default to be `df.new` if not provided; can be a subset of `df.new` |
 | `param`        | The coefficients to conduct transductive inference; default to be all the original coefficients in mdl if not provided; can be a mixture of string names and integer indices |
