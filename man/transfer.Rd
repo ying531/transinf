@@ -6,8 +6,8 @@
 \usage{
 transfer(
   object,
-  df.new,
-  df.cond.new = NULL,
+  newdata,
+  cond.newdata = NULL,
   param = NULL,
   wts = NULL,
   alg = "loess",
@@ -20,11 +20,11 @@ transfer(
 \arguments{
 \item{object}{An lm() or glm() object that fits the original regression}
 
-\item{df.new}{Dataframe for covariate shift attributes for the new population}
+\item{newdata}{Dataframe for covariate shift attributes for the new population}
 
-\item{df.cond.new}{Dataframe for the new conditioning set; default to be df.new if not provided; can be a subset of df.new}
+\item{cond.newdata}{Optional, dataframe for the new conditioning set; default to be newdata if not provided; can be a subset of newdata}
 
-\item{param}{The coefficients to conduct transductive inference; default to be all the original coefficients in mdl if not provided; can be a mixture of string names and integer indices}
+\item{param}{The coefficients to conduct transductive inference; default to be all the original coefficients in object if not provided; can be a mixture of string names and integer indices}
 
 \item{wts}{Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package}
 
@@ -52,7 +52,7 @@ colnames(dat)[1] = "Y"
 lm.mdl = lm(Y~., data = dat)
 new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1) 
 colnames(new.Z) = c("X1", "X2")
-transfer(lm.mdl, df.new=new.Z)
-transfer(lm.mdl, df.new=new.Z, param=c(1,"X1","X2")) 
+transfer(lm.mdl, newdata=new.Z)
+transfer(lm.mdl, newdata=new.Z, param=c(1,"X1","X2")) 
 
 }

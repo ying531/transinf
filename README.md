@@ -8,18 +8,18 @@ R package that implements conditional transductive inference for lm and glm mode
 
 ## Basic usage
 
-Suppose one would like to transfer the linear model Y~X to a new population, and there is a covariate shift on attributes Z, a subset of the original covariates. Let `Z.new` store the new attributes, `data` be the original dataset containing Y and X (*names for the attributes in Z should be consistent in `Z.new` and `data`*). Then simply run the original linear model with `lm()`. The `transfer` function in our package takes the `lm()` object as input and transfer it to the new population. 
+Suppose one would like to transfer the linear model Y~X to a new population, and there is a covariate shift on attributes Z, a subset of the original covariates. Let `Z.new` store the new attributes, `data` be the original dataset containing Y and X (*column names for the attributes in Z should be consistent in `Z.new` and `data`*). Then simply run the original linear model with `lm()`. The `transfer` function in our package takes the `lm()` object as input and transfer it to the new population. 
 
 ```R
 lm.mdl = lm(Y~., data = data) 
-tlm.mdl = transfer(lm.mdl, df.new = Z.new)
+tlm.mdl = transfer(lm.mdl, newdata = Z.new)
 ```
 
 By default, the `transfer()` function transfers all the coefficients in the `lm()` model. The usage is the same for `glm()` models. Below is an example for logistic regression. 
 
 ```R
 glm.mdl = lm(Y~., family = 'binomial', data = data) 
-tglm.mdl = transfer(glm.mdl, df.new = Z.new)
+tglm.mdl = transfer(glm.mdl, newdata = Z.new)
 ```
 
 For details on the statistical inference procedure and theory, see [our paper](https://arxiv.org/abs/2104.04565). For details on the usage, see the Documentation and Examples parts below. 
@@ -103,8 +103,8 @@ cat(mean(res.trans[3,]))
 ```
 transfer( 
   object,
-  df.new, 
-  df.cond.new = NULL,
+  newdata, 
+  cond.newdata = NULL,
   param = NULL,
   wts = NULL,
   alg = "loess",
@@ -118,10 +118,10 @@ transfer(
 This function takes a fitted `lm()` or `glm()` object as input, and transfers it to a new population.  You also need to specify `df.new`, the covariate shift attributes in the new population. **Please make sure the column names are consistent across the data used in lm() or glm() and in `df.new`**.
 
 | Arguments      | Description                                                  |
-| -------------- | ------------------------------------------------------------ | 
+| -------------- | ------------------------------------------------------------ |
 | `object`    | An lm() or glm() object that fits the original regression    |
-| `df.new`       | Dataframe for covariate shift attributes for the new population |
-| `df.cond.new`  | Dataframe for the new conditioning set; default to be `df.new` if not provided; can be a subset of `df.new` |
+| `newdata` | Dataframe for covariate shift attributes for the new population |
+| `cond.newdata` | Dataframe for the new conditioning set; default to be `df.new` if not provided; can be a subset of `df.new` |
 | `param`        | The coefficients to conduct transductive inference; default to be all the original coefficients in mdl if not provided; can be a mixture of string names and integer indices |
 | `wts`      | Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package |
 | `alg`          | Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include 'loess' and 'grf' |
@@ -161,7 +161,7 @@ The following example works out transductive inference of linear regression coef
 > new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1) 
 > colnames(new.Z) = c("X1", "X2")
 > lm.mdl = lm(Y~., data = dat)
-> transfer(lm.mdl, df.new=new.Z, param=c(1,"X1","X2"), alg='grf') 
+> transfer(lm.mdl, newdata=new.Z, param=c(1,"X1","X2"), alg='grf') 
 
 Summary of transductive inference in linear models
 
@@ -186,7 +186,7 @@ The following example conducts conditional inference for a misspecified linear m
 > new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1) 
 > colnames(new.Z) = c("X1", "X2")
 > lm.mdl = lm(Y~., data = data.frame(X))
-> transfer(lm.mdl, df.new=new.Z, param=c(1,"X1","X2"), alg="grf")
+> transfer(lm.mdl, newdata=new.Z, param=c(1,"X1","X2"), alg="grf")
 
 Summary of transductive inference in linear models
 
@@ -210,7 +210,7 @@ The following example works out transductive inference for parameters from a wel
 > colnames(dat)[1] = "Y"   
 > new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1)
 > glm.mdl = glm(Y~., family='binomial', data=dat)
-> transfer(glm.mdl, df.new=new.Z, param=c("X1"), alg='loess')
+> transfer(glm.mdl, newdata=new.Z, param=c("X1"), alg='loess')
 
 Summary of transductive inference in generalized linear models
 
@@ -228,7 +228,7 @@ This is an example of conditional inference for parameters from a misspecified l
 > colnames(dat)[1] = "Y"  
 > new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1) 
 > glm.mdl = glm(Y~., family='binomial', data=dat)
-> transfer(glm.mdl, df.new=new.Z, param=c("X3",3), alg='grf')
+> transfer(glm.mdl, newdata=new.Z, param=c("X3",3), alg='grf')
 
 Summary of transductive inference in generalized linear models
 

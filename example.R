@@ -56,9 +56,9 @@ weight.simu.trans <- function(seed){
   colnames(dtrain)[11] = "Y" 
   X.new = data.frame(data$X.new)
   lm.mdl = lm(Y~., data = dtrain)
-  tlm.mdl = transfer(lm.mdl, df.new=X.new, alg='grf', verbose=FALSE)
+  tlm.mdl = transfer(lm.mdl, newdata=X.new, alg='grf', verbose=FALSE)
   
-  return(c(tlm.mdl$trans.coef[2], tlm.mdl$sup.w.std.err[2]/sqrt(nrow(data$X.org)), 
+  return(c(tlm.mdl$trans.coef[2], tlm.mdl$sup.std.err[2]/sqrt(nrow(data$X.org)), 
            tlm.mdl$trans.std.err[2]/sqrt(nrow(data$X.org))))
 }
 

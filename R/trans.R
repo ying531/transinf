@@ -2,9 +2,9 @@
 #' 
 #' Implement the transductive inference procedure for (weighted) linear and generalized linear regression, wrapping around an lm() or glm() object
 #' @param object An lm() or glm() object that fits the original regression 
-#' @param df.new Dataframe for covariate shift attributes for the new population
-#' @param df.cond.new Dataframe for the new conditioning set; default to be df.new if not provided; can be a subset of df.new
-#' @param param The coefficients to conduct transductive inference; default to be all the original coefficients in mdl if not provided; can be a mixture of string names and integer indices 
+#' @param newdata Dataframe for covariate shift attributes for the new population
+#' @param cond.newdata Optional, dataframe for the new conditioning set; default to be newdata if not provided; can be a subset of newdata
+#' @param param The coefficients to conduct transductive inference; default to be all the original coefficients in object if not provided; can be a mixture of string names and integer indices 
 #' @param wts Optional, pre-specified covariate shift (weights); if not given, we automatically fit using grf package
 #' @param alg Optional, a string for name of algorithm in fitting the conditional mean of influence functions, current options include `loess` and `grf`
 #' @param random.seed Optional, random seed for sample splitting
@@ -20,24 +20,24 @@
 #' lm.mdl = lm(Y~., data = dat)
 #' new.Z = data.frame(matrix(runif(500*2), nrow=500)*2-1) 
 #' colnames(new.Z) = c("X1", "X2")
-#' transfer(lm.mdl, df.new=new.Z)
-#' transfer(lm.mdl, df.new=new.Z, param=c(1,"X1","X2")) 
+#' transfer(lm.mdl, newdata=new.Z)
+#' transfer(lm.mdl, newdata=new.Z, param=c(1,"X1","X2")) 
 #' 
 #' @export
-transfer <- function(object, df.new, df.cond.new=NULL, 
+transfer <- function(object, newdata, cond.newdata=NULL, 
                      param=NULL,wts=NULL,alg="loess",
                      random.seed=NULL,other.params=NULL,folds=NULL,verbose=TRUE){
-  org.data = mdl$model
-  org.formula = eval(mdl$call[[2]])
+  org.data = object$model
+  org.formula = eval(object$call[[2]])
   n = nrow(org.data)
-  m = nrow(df.new)
+  m = nrow(newdata)
   
   if (!is.null(random.seed)){
     set.seed(random.seed)
   }
    
   if (is.null(param)){
-    param = 1:length(mdl$coefficients)
+    param = 1:length(object$coefficients)
   }
   
   # sample splitting  
@@ -46,15 +46,15 @@ transfer <- function(object, df.new, df.cond.new=NULL,
   fold2 = setdiff(1:(n+m), fold1) 
   
   # extract original Z
-  Z = org.data[,colnames(df.new)]
+  Z = org.data[,colnames(newdata)]
   
   ##=======================================##
   ##=== fit the weights if not provided ===## 
   ##=======================================## 
   ws = rep(0, m+n)
   if (is.null(wts)){ 
-    df.Z = data.frame(rbind(as.matrix(Z), as.matrix(df.new)))
-    label.Z = c(rep(0, nrow(Z)), rep(1, nrow(df.new)))
+    df.Z = data.frame(rbind(as.matrix(Z), as.matrix(newdata)))
+    label.Z = c(rep(0, nrow(Z)), rep(1, nrow(newdata)))
     # cross fitting 
     Z.rf.1 = regression_forest(df.Z[fold2,], label.Z[fold2])
     rf.pred.1 = predict(Z.rf.1, newdata = df.Z[fold1,])$predictions
@@ -70,11 +70,11 @@ transfer <- function(object, df.new, df.cond.new=NULL,
   ##=====================================##
   ##===== run weighted (generalized) linear model =====## 
   ##=====================================## 
-  if (class(mdl)[1]=='lm'){
+  if (class(object)[1]=='lm'){
     wlm.mdl = lm.internal(formula=org.formula, data=org.data, weights=ws)
-  }else if (class(mdl)[1]=='glm'){
+  }else if (class(object)[1]=='glm'){
     wlm.mdl = glm.internal(formula=org.formula, data=org.data, 
-                           family=mdl$family$family, weights=ws)
+                           family=object$family$family, weights=ws)
   }else{
     cat("Not lm() or glm() model!")
     cat("\n")
@@ -119,7 +119,7 @@ transfer <- function(object, df.new, df.cond.new=NULL,
                    span=loess.span, degree=loess.deg) 
       fit.Zr[fold1[fold1<=n]] = predict(Zr.1, data.frame(Z[fold1[fold1<=n],]))
       fit.Zr[fold2[fold2<=n]] = predict(Zr.2, data.frame(Z[fold2[fold2<=n],]))
-      fit.Zr.new = (predict(Zr.1, data.frame(df.new)) + predict(Zr.2, data.frame(df.new)))/2
+      fit.Zr.new = (predict(Zr.1, data.frame(newdata)) + predict(Zr.2, data.frame(newdata)))/2
     } 
     # random forest regression
     if (alg == 'grf'){
@@ -130,8 +130,8 @@ transfer <- function(object, df.new, df.cond.new=NULL,
                                uw.infl.vals[fold1[fold1<=n],i.par], num.threads=1)
       fit.Zr[fold1[fold1<=n]] = predict(Zr.1, data.frame(Z[fold1[fold1<=n],]))$predictions
       fit.Zr[fold2[fold2<=n]] = predict(Zr.2, data.frame(Z[fold2[fold2<=n],]))$predictions
-      fit.Zr.new = (predict(Zr.1, data.frame(df.new))$predictions + 
-                      predict(Zr.2, data.frame(df.new))$predictions)/2
+      fit.Zr.new = (predict(Zr.1, data.frame(newdata))$predictions + 
+                      predict(Zr.2, data.frame(newdata))$predictions)/2
     }
     
     ##======================================##
@@ -144,9 +144,9 @@ transfer <- function(object, df.new, df.cond.new=NULL,
     
     ##===============================================##
     ##== compute conditional-transductive variance ==##    
-    if (is.null(df.cond.new)){
+    if (is.null(cond.newdata)){
       trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
-    }else if(ncol(df.cond.new) == ncol(Z)){
+    }else if(ncol(cond.newdata) == ncol(Z)){
       # If X=Z, then directly compute std
       trans.sds[i.par] = min(sup.sds[i.par], sd(ws * (uw.infl.vals[,i.par] - fit.Zr), na.rm=TRUE))
     }else{
@@ -157,22 +157,22 @@ transfer <- function(object, df.new, df.cond.new=NULL,
         loess.span = ifelse(is.null(other.params$span), 0.75, other.params$span)
         loess.deg = ifelse(is.null(other.params$degree), 2, other.params$degree) 
         # cross-fit nonparametric regression models
-        Xr.1 = loess(fit.Zr.new[fold2[fold2>n]]~., data=data.frame(df.cond.new[fold2[fold2>n],]),
+        Xr.1 = loess(fit.Zr.new[fold2[fold2>n]]~., data=data.frame(cond.newdata[fold2[fold2>n],]),
                      span=loess.span, degree=loess.deg) 
-        Xr.2 = loess(fit.Zr.new[fold1[fold1>n]]~., data=data.frame(df.cond.new[fold1[fold1>n],]),
+        Xr.2 = loess(fit.Zr.new[fold1[fold1>n]]~., data=data.frame(cond.newdata[fold1[fold1>n],]),
                      span=loess.span, degree=loess.deg) 
-        fit.Xr[fold1[fold1>n]] = predict(Xr.1, data.frame(df.cond.new[fold1[fold1>n],]))
-        fit.Xr[fold2[fold2>n]] = predict(Xr.2, data.frame(df.cond.new[fold2[fold2>n],])) 
+        fit.Xr[fold1[fold1>n]] = predict(Xr.1, data.frame(cond.newdata[fold1[fold1>n],]))
+        fit.Xr[fold2[fold2>n]] = predict(Xr.2, data.frame(cond.newdata[fold2[fold2>n],])) 
       } 
       # random forest regression
       if (alg == 'grf'){
         # cross-fit nonparametric regression models
-        Zr.1 = regression_forest(data.frame(df.cond.new[fold2[fold2>n],]), 
+        Zr.1 = regression_forest(data.frame(cond.newdata[fold2[fold2>n],]), 
                                  fit.Zr.new[fold2[fold2>n]], num.threads=1)
-        Zr.2 = regression_forest(data=data.frame(df.cond.new[fold1[fold1>n],]), 
+        Zr.2 = regression_forest(data=data.frame(cond.newdata[fold1[fold1>n],]), 
                                  fit.Zr.new[fold1[fold1>n]], num.threads=1)
-        fit.Xr[fold1[fold1>n]] = predict(Zr.1, data.frame(df.cond.new[fold1[fold1>n],]))$predictions
-        fit.Xr[fold2[fold2>n]] = predict(Zr.2, data.frame(df.cond.new[fold2[fold2>n],]))$predictions 
+        fit.Xr[fold1[fold1>n]] = predict(Zr.1, data.frame(cond.newdata[fold1[fold1>n],]))$predictions
+        fit.Xr[fold2[fold2>n]] = predict(Zr.2, data.frame(cond.newdata[fold2[fold2>n],]))$predictions 
       }
       # compute the variance
       trans.sds[i.par] = sqrt(min(sd(ws*uw.infl.vals[,i.par], na.rm=TRUE)^2, 
@@ -198,9 +198,9 @@ transfer <- function(object, df.new, df.cond.new=NULL,
   # print the summary if verbose==TRUE
   if (verbose){
     cat("\n")
-    if (class(mdl)[1]=='lm'){
+    if (class(object)[1]=='lm'){
       cat("Summary of transductive inference in linear models")
-    }else if (class(mdl)[1]=='glm'){
+    }else if (class(object)[1]=='glm'){
       cat("Summary of transductive inference in generalized linear models")
     } 
     cat("\n\n")
