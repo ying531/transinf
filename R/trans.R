@@ -27,7 +27,7 @@
 transfer <- function(object, newdata, cond.newdata=NULL, 
                      param=NULL,wts=NULL,alg="loess",
                      random.seed=NULL,other.params=NULL,folds=NULL,verbose=TRUE){
-  org.data = object$model
+  org.data = eval(getCall(dim.lm)$data)#object$model
   org.formula = eval(object$call[[2]])
   n = nrow(org.data)
   m = nrow(newdata)
@@ -45,8 +45,9 @@ transfer <- function(object, newdata, cond.newdata=NULL,
   }else{ fold1 = folds[[1]] } 
   fold2 = setdiff(1:(n+m), fold1) 
   
-  # extract original Z
-  Z = org.data[,colnames(newdata)]
+  # extract original Z 
+  Z = org.data[,colnames(newdata)] 
+  
   
   ##=======================================##
   ##=== fit the weights if not provided ===## 
