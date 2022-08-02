@@ -27,7 +27,7 @@
 transfer <- function(object, newdata, cond.newdata=NULL, 
                      param=NULL,wts=NULL,alg="loess",
                      random.seed=NULL,other.params=NULL,folds=NULL,verbose=TRUE){
-  org.data = eval(getCall(dim.lm)$data)#object$model
+  org.data = eval(getCall(object)$data)#object$model
   org.formula = eval(object$call[[2]])
   n = nrow(org.data)
   m = nrow(newdata)
